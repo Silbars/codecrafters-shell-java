@@ -5,12 +5,14 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
 public class Main {
-    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type"));
-    public static void main(String[] args) throws Exception {
+    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd"));
+
+    public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         while (true) { 
             System.out.print("$ ");
@@ -24,13 +26,11 @@ public class Main {
             
             handleCommand(command, arguments, input);
         }
-
-
     }
 
     private static void handleCommand(String command, String arguments, String input) {
         switch (command) {
-            case "exit" :
+            case "exit":
                 System.exit(0);
                 break;
             case "echo":
@@ -38,6 +38,9 @@ public class Main {
                 break;
             case "type":
                 handleType(arguments);
+                break;
+            case "pwd":
+                System.out.println(getWorkingDirectory());
                 break;
             default:
                 String executablePath = findExecutable(command);
@@ -47,7 +50,6 @@ public class Main {
                 } else {
                     executeProgram(command, arguments);
                 }
-                
                 break;
         }
     }
@@ -67,18 +69,16 @@ public class Main {
 
     private static String findExecutable(String input) {
         String pathEnv = System.getenv("PATH");
-        String[] pathDirectories = pathEnv.split(File.pathSeparator);
+        
+        if (pathEnv == null) return null;
 
-        // String result = input + ": not found";
+        String[] pathDirectories = pathEnv.split(File.pathSeparator);
 
         for (String directory : pathDirectories) {
             Path path = Paths.get(directory, input);
 
-            if(Files.isExecutable(path) && !Files.isDirectory(path)) {
-                // result = (input + " is " + path);
-                // return result;
-                String pathString = path + "";
-                return pathString;
+            if (Files.isExecutable(path) && !Files.isDirectory(path)) {
+                return path.toAbsolutePath().toString();
             }
         }
         return null;
@@ -86,16 +86,15 @@ public class Main {
 
     private static void executeProgram(String command, String arguments) {
         try {
-            ArrayList<String> commandList = new ArrayList<>();
+            List<String> commandList = new ArrayList<>();
             commandList.add(command);
 
-            if(!arguments.isEmpty()) {
-                String[] argArr = arguments.split("\\s+");
+            if (!arguments.isEmpty()) {
+                String[] argArr = arguments.trim().split("\\s+");
                 commandList.addAll(Arrays.asList(argArr));
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
-
             pb.inheritIO();
             Process process = pb.start();
             process.waitFor();
@@ -103,5 +102,10 @@ public class Main {
         } catch (Exception e) {
             System.out.println("Error executing program: " + e.getMessage());
         }
+    }
+    
+    private static String getWorkingDirectory() {
+        String pwd = System.getProperty("user.dir");
+        return pwd;
     }
 }
