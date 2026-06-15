@@ -12,6 +12,8 @@ import java.util.Set;
 public class Main {
     private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd"));
 
+    private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
+
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         while (true) { 
@@ -40,7 +42,10 @@ public class Main {
                 handleType(arguments);
                 break;
             case "pwd":
-                System.out.println(getWorkingDirectory());
+                System.out.println(currentDirectory.toAbsolutePath());
+                break;
+            case "cd":
+                handleCd(arguments);
                 break;
             default:
                 String executablePath = findExecutable(command);
@@ -95,6 +100,8 @@ public class Main {
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
+
+            
             pb.inheritIO();
             Process process = pb.start();
             process.waitFor();
@@ -103,9 +110,14 @@ public class Main {
             System.out.println("Error executing program: " + e.getMessage());
         }
     }
-    
-    private static String getWorkingDirectory() {
-        String pwd = System.getProperty("user.dir");
-        return pwd;
+
+    private static void handleCd(String pathArg) {
+        Path targetPath = Paths.get(pathArg);
+
+        if(Files.exists(targetPath) && Files.isDirectory(targetPath)) {
+            currentDirectory = targetPath.toAbsolutePath();
+        } else {
+            System.out.println("cd: " + pathArg + ": No such file or directory");
+        }
     }
 }
