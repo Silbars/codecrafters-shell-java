@@ -2,6 +2,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Scanner;
@@ -39,7 +40,14 @@ public class Main {
                 handleType(arguments);
                 break;
             default:
-                System.out.println(command + ": command not found");
+                String executablePath = findExecutable(command);
+
+                if (executablePath == null) {
+                    System.out.println(command + ": command not found");
+                } else {
+                    executeProgram(command, arguments);
+                }
+                
                 break;
         }
     }
@@ -48,24 +56,52 @@ public class Main {
         if (BUILTINS.contains(input)) {
             System.out.println(input + " is a shell builtin");
         } else {
-            System.out.println(handlePath(input));
+            String executablePath = findExecutable(input);
+            if (executablePath == null) {
+                System.out.println(input + ": not found");
+            } else {
+                System.out.println(input + " is " + executablePath);
+            }
         }
     }
 
-    private static String handlePath(String input) {
+    private static String findExecutable(String input) {
         String pathEnv = System.getenv("PATH");
         String[] pathDirectories = pathEnv.split(File.pathSeparator);
 
-        String result = input + ": not found";
+        // String result = input + ": not found";
 
         for (String directory : pathDirectories) {
             Path path = Paths.get(directory, input);
 
             if(Files.isExecutable(path) && !Files.isDirectory(path)) {
-                result = (input + " is " + path);
-                return result;
+                // result = (input + " is " + path);
+                // return result;
+                String pathString = path + "";
+                return pathString;
             }
         }
-        return result;
+        return null;
+    }
+
+    private static void executeProgram(String command, String arguments) {
+        try {
+            ArrayList<String> commandList = new ArrayList<>();
+            commandList.add(command);
+
+            if(!arguments.isEmpty()) {
+                String[] argArr = arguments.split("\\s+");
+                commandList.addAll(Arrays.asList(argArr));
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(commandList);
+
+            pb.inheritIO();
+            Process process = pb.start();
+            process.waitFor();
+            
+        } catch (Exception e) {
+            System.out.println("Error executing program: " + e.getMessage());
+        }
     }
 }
