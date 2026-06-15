@@ -7,7 +7,13 @@ public class Main {
             System.out.print("$ ");
             String command = sc.nextLine();
             if (command.equals("exit")) break;
-            else System.out.println(command + ": command not found");    
+
+            if(command.contains("echo")) {
+                String newCommand = command.replace("echo ", "");
+                System.out.println(newCommand);
+            } else {
+                System.out.println(command + ": command not found");    
+            }
         }
         sc.close();
     }
