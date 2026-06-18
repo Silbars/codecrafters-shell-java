@@ -111,6 +111,12 @@ public class Main {
     }
 
     private static void handleCd(String pathArg) {
+        if (pathArg.equals("~") || pathArg.startsWith("~/")) {
+            String homeDir = System.getenv("HOME");
+            if(homeDir == null) return;
+            pathArg = pathArg.replaceFirst("^~", homeDir);
+        }
+
         Path targetPath = currentDirectory.resolve(pathArg).normalize();
 
         if(Files.exists(targetPath) && Files.isDirectory(targetPath)) {
