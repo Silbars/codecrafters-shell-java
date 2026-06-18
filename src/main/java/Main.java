@@ -100,8 +100,7 @@ public class Main {
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
-
-            
+            pb.directory(currentDirectory.toFile());
             pb.inheritIO();
             Process process = pb.start();
             process.waitFor();
@@ -112,7 +111,7 @@ public class Main {
     }
 
     private static void handleCd(String pathArg) {
-        Path targetPath = Paths.get(pathArg);
+        Path targetPath = currentDirectory.resolve(pathArg).normalize();
 
         if(Files.exists(targetPath) && Files.isDirectory(targetPath)) {
             currentDirectory = targetPath.toAbsolutePath();
