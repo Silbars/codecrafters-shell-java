@@ -140,6 +140,10 @@ public class Main {
                 else current.append(c);
             } else if (inDoubleQuotes) {
                 if (c == '\"') inDoubleQuotes = false;
+                else if(c == '\\' && i + 1 < arguments.length()) {
+                    current.append(arguments.charAt(i+1));
+                    i++;
+                }
                 else current.append(c);
             } else {
                 if (c == '\\' && i + 1 < arguments.length()) {
