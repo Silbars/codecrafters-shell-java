@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -10,33 +11,61 @@ import java.util.Scanner;
 import java.util.Set;
 
 public class Main {
+
     private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd", "cd"));
 
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
-        while (true) { 
+        while (true) {
             System.out.print("$ ");
             String input = sc.nextLine().trim();
 
-            if (input.isEmpty()) continue;
+            if (input.isEmpty()) {
+                continue;
+            }
 
             List<String> inputParts = parsedQuotes(input);
             String command = inputParts.get(0);
-            List<String> arguments = inputParts.size() > 1 ? inputParts.subList(1, inputParts.size()) : new ArrayList<>();
-            
-            handleCommand(command, arguments, input);
+            List<String> arguments = inputParts.size() > 1 ? inputParts.subList(1, inputParts.size())
+                    : new ArrayList<>();
+
+            handleCommand(command, arguments, inputParts);
         }
     }
 
-    private static void handleCommand(String command, List<String> arguments, String input) {
+    private static void handleCommand(String command, List<String> arguments, List<String> inputParts) {
+        String outputFile = null;
+
+        for (int i = 0; i < arguments.size(); i++) {
+            String str = arguments.get(i);
+
+            if ((str.equals(">") || str.equals("1>")) && i < arguments.size() - 1) {
+                outputFile = arguments.get(i + 1);
+                arguments.subList(i, i + 2).clear();
+                break;
+            } else if ((str.equals(">") || str.equals("1>")) && i == arguments.size() - 1) {
+                System.out.println("syntax error: expected file name after redirection");
+                arguments.remove(i);
+                break;
+            }
+        }
+
         switch (command) {
             case "exit":
                 System.exit(0);
                 break;
             case "echo":
-                System.out.println(String.join(" ", arguments));
+                if (outputFile != null) {
+                    try {
+                        Files.writeString(Path.of(outputFile), String.join(" ", arguments) + "\n");
+                    } catch (IOException e) {
+                        System.out.println("echo: permission denied or cannot write to file");
+                    }
+                } else {
+                    System.out.println(String.join(" ", arguments));
+                }
                 break;
             case "type":
                 handleType(String.join(" ", arguments));
@@ -53,7 +82,7 @@ public class Main {
                 if (executablePath == null) {
                     System.out.println(command + ": command not found");
                 } else {
-                    executeProgram(command, arguments);
+                    executeProgram(command, arguments, outputFile);
                 }
                 break;
         }
@@ -74,8 +103,10 @@ public class Main {
 
     private static String findExecutable(String input) {
         String pathEnv = System.getenv("PATH");
-        
-        if (pathEnv == null) return null;
+
+        if (pathEnv == null) {
+            return null;
+        }
 
         String[] pathDirectories = pathEnv.split(File.pathSeparator);
 
@@ -89,7 +120,7 @@ public class Main {
         return null;
     }
 
-    private static void executeProgram(String command, List<String> arguments) {
+    private static void executeProgram(String command, List<String> arguments, String outputFile) {
         try {
             List<String> commandList = new ArrayList<>();
             commandList.add(command);
@@ -100,10 +131,15 @@ public class Main {
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
             pb.directory(currentDirectory.toFile());
+
             pb.inheritIO();
+            if (outputFile != null) {
+                pb.redirectOutput(new File(outputFile));
+            }
+
             Process process = pb.start();
             process.waitFor();
-            
+
         } catch (Exception e) {
             System.out.println("Error executing program: " + e.getMessage());
         }
@@ -112,13 +148,15 @@ public class Main {
     private static void handleCd(String pathArg) {
         if (pathArg.equals("~") || pathArg.startsWith("~/")) {
             String homeDir = System.getenv("HOME");
-            if(homeDir == null) return;
+            if (homeDir == null) {
+                return;
+            }
             pathArg = pathArg.replaceFirst("^~", homeDir);
         }
 
         Path targetPath = currentDirectory.resolve(pathArg).normalize();
 
-        if(Files.exists(targetPath) && Files.isDirectory(targetPath)) {
+        if (Files.exists(targetPath) && Files.isDirectory(targetPath)) {
             currentDirectory = targetPath.toAbsolutePath();
         } else {
             System.out.println("cd: " + pathArg + ": No such file or directory");
@@ -133,29 +171,38 @@ public class Main {
 
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
-            
+
             if (inSingleQuotes) {
-                if (c == '\'') inSingleQuotes = false;
-                else current.append(c);
-            } else if (inDoubleQuotes) {
-                if (c == '\"') inDoubleQuotes = false;
-                else if(c == '\\' && i + 1 < input.length()) {
-                    current.append(input.charAt(i+1));
-                    i++;
+                if (c == '\'') {
+                    inSingleQuotes = false; 
+                }else {
+                    current.append(c);
                 }
-                else current.append(c);
+            } else if (inDoubleQuotes) {
+                if (c == '\"') {
+                    inDoubleQuotes = false; 
+                }else if (c == '\\' && i + 1 < input.length()) {
+                    current.append(input.charAt(i + 1));
+                    i++;
+                } else {
+                    current.append(c);
+                }
             } else {
                 if (c == '\\' && i + 1 < input.length()) {
-                    current.append(input.charAt(i+1));
+                    current.append(input.charAt(i + 1));
                     i++;
-                } else if (c == '\'') inSingleQuotes = true;
-                else if (c == '\"') inDoubleQuotes = true;
-                else if (c == ' ') {
+                } else if (c == '\'') {
+                    inSingleQuotes = true; 
+                }else if (c == '\"') {
+                    inDoubleQuotes = true; 
+                }else if (c == ' ') {
                     if (current.length() > 0) {
                         args.add(current.toString());
                         current = new StringBuilder();
                     }
-                } else current.append(c);
+                } else {
+                    current.append(c);
+                }
             }
         }
         if (current.length() > 0) {
