@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,6 +82,18 @@ public class Main {
                 } catch (IOException e) {
                     // Ignore
                 }
+            } else if (redirection.type.equals(">>") || redirection.type.equals("1>>")) {
+                try (FileWriter fw = new FileWriter(redirection.file, true)) {
+                    fw.write(arguments + "\n");
+                } catch (IOException e) {
+                    System.out.println("echo: permission denied or cannot write to file");
+                }
+            } else if (redirection.type.equals("2>>")) {
+                System.out.println(arguments);
+
+                try (FileWriter fw = new FileWriter(redirection.file, true)) {
+                    fw.write("");
+                } catch (IOException e) {}
             }
         } else {
             System.out.println(arguments);
@@ -105,7 +118,12 @@ public class Main {
         for (int i = 0; i < arguments.size(); i++) {
             String str = arguments.get(i);
 
-            if (str.equals(">") || str.equals("1>") || str.equals("2>")) {
+            if (str.equals(">") || 
+                str.equals("1>") || 
+                str.equals("2>") ||
+                str.equals(">>") || 
+                str.equals("1>>") ||
+                str.equals("2>>")) {
                 if ( i < arguments.size() - 1) {
                     String outputFile = arguments.get(i + 1);
                     arguments.subList(i, i + 2).clear();
@@ -151,13 +169,17 @@ public class Main {
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
             pb.directory(currentDirectory.toFile());
-
             pb.inheritIO();
             if (redirection != null) {
+                ProcessBuilder.Redirect appendRedirect = ProcessBuilder.Redirect.appendTo(new File(redirection.file));
                 if(redirection.type.equals(">") || redirection.type.equals("1>")) {
                     pb.redirectOutput(new File(redirection.file));
                 } else if (redirection.type.equals("2>")) {
                     pb.redirectError(new File(redirection.file));
+                } else if (redirection.type.equals("1>>") || redirection.type.equals(">>")) {
+                    pb.redirectOutput(appendRedirect);
+                } else if (redirection.type.equals("2>>")) {
+                    pb.redirectError(appendRedirect);
                 }
             } 
 
