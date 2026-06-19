@@ -134,7 +134,7 @@ public class Main {
 
         for (int i = 0; i < arguments.length(); i++) {
             char c = arguments.charAt(i);
-             
+            
             if (inSingleQuotes) {
                 if (c == '\'') inSingleQuotes = false;
                 else current.append(c);
@@ -142,7 +142,10 @@ public class Main {
                 if (c == '\"') inDoubleQuotes = false;
                 else current.append(c);
             } else {
-                if (c == '\'') inSingleQuotes = true;
+                if (c == '\\' && i + 1 < arguments.length()) {
+                    current.append(arguments.charAt(i+1));
+                    i++;
+                } else if (c == '\'') inSingleQuotes = true;
                 else if (c == '\"') inDoubleQuotes = true;
                 else if (c == ' ') {
                     if (current.length() > 0) {
