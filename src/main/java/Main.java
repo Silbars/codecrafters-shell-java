@@ -10,7 +10,7 @@ import java.util.Scanner;
 import java.util.Set;
 
 public class Main {
-    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd"));
+    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd", "cd"));
 
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
 
@@ -22,31 +22,30 @@ public class Main {
 
             if (input.isEmpty()) continue;
 
-            String[] inputParts = input.split(" ", 2);
-            String command = inputParts[0];
-            String arguments = inputParts.length > 1 ? inputParts[1] : "";
+            List<String> inputParts = parsedQuotes(input);
+            String command = inputParts.get(0);
+            List<String> arguments = inputParts.size() > 1 ? inputParts.subList(1, inputParts.size()) : new ArrayList<>();
             
             handleCommand(command, arguments, input);
         }
     }
 
-    private static void handleCommand(String command, String arguments, String input) {
+    private static void handleCommand(String command, List<String> arguments, String input) {
         switch (command) {
             case "exit":
                 System.exit(0);
                 break;
             case "echo":
-                List<String> parsedArgs = parseArguments(arguments);
-                System.out.println(String.join(" ", parsedArgs));
+                System.out.println(String.join(" ", arguments));
                 break;
             case "type":
-                handleType(arguments);
+                handleType(String.join(" ", arguments));
                 break;
             case "pwd":
                 System.out.println(currentDirectory.toAbsolutePath());
                 break;
             case "cd":
-                handleCd(arguments);
+                handleCd(String.join(" ", arguments));
                 break;
             default:
                 String executablePath = findExecutable(command);
@@ -90,13 +89,13 @@ public class Main {
         return null;
     }
 
-    private static void executeProgram(String command, String arguments) {
+    private static void executeProgram(String command, List<String> arguments) {
         try {
             List<String> commandList = new ArrayList<>();
             commandList.add(command);
 
             if (!arguments.isEmpty()) {
-                commandList.addAll(parseArguments(arguments));
+                commandList.addAll(arguments);
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
@@ -126,28 +125,28 @@ public class Main {
         }
     }
 
-    private static List<String> parseArguments(String arguments) {
+    private static List<String> parsedQuotes(String input) {
         List<String> args = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingleQuotes = false;
         boolean inDoubleQuotes = false;
 
-        for (int i = 0; i < arguments.length(); i++) {
-            char c = arguments.charAt(i);
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
             
             if (inSingleQuotes) {
                 if (c == '\'') inSingleQuotes = false;
                 else current.append(c);
             } else if (inDoubleQuotes) {
                 if (c == '\"') inDoubleQuotes = false;
-                else if(c == '\\' && i + 1 < arguments.length()) {
-                    current.append(arguments.charAt(i+1));
+                else if(c == '\\' && i + 1 < input.length()) {
+                    current.append(input.charAt(i+1));
                     i++;
                 }
                 else current.append(c);
             } else {
-                if (c == '\\' && i + 1 < arguments.length()) {
-                    current.append(arguments.charAt(i+1));
+                if (c == '\\' && i + 1 < input.length()) {
+                    current.append(input.charAt(i+1));
                     i++;
                 } else if (c == '\'') inSingleQuotes = true;
                 else if (c == '\"') inDoubleQuotes = true;
