@@ -36,7 +36,8 @@ public class Main {
                 System.exit(0);
                 break;
             case "echo":
-                System.out.println(arguments);
+                List<String> parsedArgs = parseArguments(arguments);
+                System.out.println(String.join(" ", parsedArgs));
                 break;
             case "type":
                 handleType(arguments);
@@ -95,8 +96,7 @@ public class Main {
             commandList.add(command);
 
             if (!arguments.isEmpty()) {
-                String[] argArr = arguments.trim().split("\\s+");
-                commandList.addAll(Arrays.asList(argArr));
+                commandList.addAll(parseArguments(arguments));
             }
 
             ProcessBuilder pb = new ProcessBuilder(commandList);
@@ -124,5 +124,32 @@ public class Main {
         } else {
             System.out.println("cd: " + pathArg + ": No such file or directory");
         }
+    }
+
+    private static List<String> parseArguments(String arguments) {
+        List<String> args = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inSingleQuotes = false;
+
+        for (int i = 0; i < arguments.length(); i++) {
+            char c = arguments.charAt(i);
+
+            if (c == '\'' && !inSingleQuotes) {
+                inSingleQuotes = true;
+            } else if (c == '\'' && inSingleQuotes) {
+                inSingleQuotes = false;
+            } else if (c == ' ' && !inSingleQuotes) {
+                if (current.length() > 0) {
+                    args.add(current.toString());
+                    current = new StringBuilder();
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        if (current.length() > 0) {
+            args.add(current.toString());
+        }
+        return args;
     }
 }
