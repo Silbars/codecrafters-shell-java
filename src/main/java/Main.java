@@ -130,21 +130,26 @@ public class Main {
         List<String> args = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingleQuotes = false;
+        boolean inDoubleQuotes = false;
 
         for (int i = 0; i < arguments.length(); i++) {
             char c = arguments.charAt(i);
-
-            if (c == '\'' && !inSingleQuotes) {
-                inSingleQuotes = true;
-            } else if (c == '\'' && inSingleQuotes) {
-                inSingleQuotes = false;
-            } else if (c == ' ' && !inSingleQuotes) {
-                if (current.length() > 0) {
-                    args.add(current.toString());
-                    current = new StringBuilder();
-                }
+             
+            if (inSingleQuotes) {
+                if (c == '\'') inSingleQuotes = false;
+                else current.append(c);
+            } else if (inDoubleQuotes) {
+                if (c == '\"') inDoubleQuotes = false;
+                else current.append(c);
             } else {
-                current.append(c);
+                if (c == '\'') inSingleQuotes = true;
+                else if (c == '\"') inDoubleQuotes = true;
+                else if (c == ' ') {
+                    if (current.length() > 0) {
+                        args.add(current.toString());
+                        current = new StringBuilder();
+                    }
+                } else current.append(c);
             }
         }
         if (current.length() > 0) {
