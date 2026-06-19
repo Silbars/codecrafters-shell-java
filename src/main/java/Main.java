@@ -31,50 +31,28 @@ public class Main {
             List<String> arguments = inputParts.size() > 1 ? inputParts.subList(1, inputParts.size())
                     : new ArrayList<>();
 
-            handleCommand(command, arguments, inputParts);
+            handleCommand(command, arguments);
         }
     }
 
-    private static void handleCommand(String command, List<String> arguments, List<String> inputParts) {
-        String outputFile = null;
-
-        for (int i = 0; i < arguments.size(); i++) {
-            String str = arguments.get(i);
-
-            if ((str.equals(">") || str.equals("1>")) && i < arguments.size() - 1) {
-                outputFile = arguments.get(i + 1);
-                arguments.subList(i, i + 2).clear();
-                break;
-            } else if ((str.equals(">") || str.equals("1>")) && i == arguments.size() - 1) {
-                System.out.println("syntax error: expected file name after redirection");
-                arguments.remove(i);
-                break;
-            }
-        }
-
+    private static void handleCommand(String command, List<String> arguments) {
+        Redirection redirection = extractRedirection(arguments);
+        String argstr = String.join(" ", arguments);
         switch (command) {
             case "exit":
                 System.exit(0);
                 break;
             case "echo":
-                if (outputFile != null) {
-                    try {
-                        Files.writeString(Path.of(outputFile), String.join(" ", arguments) + "\n");
-                    } catch (IOException e) {
-                        System.out.println("echo: permission denied or cannot write to file");
-                    }
-                } else {
-                    System.out.println(String.join(" ", arguments));
-                }
+                handleEcho(argstr, redirection);
                 break;
             case "type":
-                handleType(String.join(" ", arguments));
+                handleType(argstr);
                 break;
             case "pwd":
                 System.out.println(currentDirectory.toAbsolutePath());
                 break;
             case "cd":
-                handleCd(String.join(" ", arguments));
+                handleCd(argstr);
                 break;
             default:
                 String executablePath = findExecutable(command);
@@ -82,9 +60,30 @@ public class Main {
                 if (executablePath == null) {
                     System.out.println(command + ": command not found");
                 } else {
-                    executeProgram(command, arguments, outputFile);
+                    executeProgram(command, arguments, redirection);
                 }
                 break;
+        }
+    }
+
+    private static void handleEcho(String arguments, Redirection redirection) {
+        if (redirection != null) {
+            if (redirection.type.equals(">") || redirection.type.equals("1>")) {
+                try {
+                    Files.writeString(Path.of(redirection.file), arguments + "\n");
+                } catch (IOException e) {
+                    System.out.println("echo: permission denied or cannot write to file");
+                }
+            } else if (redirection.type.equals("2>")) {
+                System.out.println(arguments);
+                try {
+                    Files.writeString(Path.of(redirection.file), "");
+                } catch (IOException e) {
+                    // Ignore
+                }
+            }
+        } else {
+            System.out.println(arguments);
         }
     }
 
@@ -99,6 +98,27 @@ public class Main {
                 System.out.println(input + " is " + executablePath);
             }
         }
+    }
+
+    private static Redirection extractRedirection(List<String> arguments) {
+
+        for (int i = 0; i < arguments.size(); i++) {
+            String str = arguments.get(i);
+
+            if (str.equals(">") || str.equals("1>") || str.equals("2>")) {
+                if ( i < arguments.size() - 1) {
+                    String outputFile = arguments.get(i + 1);
+                    arguments.subList(i, i + 2).clear();
+                    return new Redirection(str, outputFile);
+                } else if (i == arguments.size() - 1) {
+                    System.out.println("syntax error: expected file name after redirection");
+                    arguments.remove(i);
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static String findExecutable(String input) {
@@ -120,7 +140,7 @@ public class Main {
         return null;
     }
 
-    private static void executeProgram(String command, List<String> arguments, String outputFile) {
+    private static void executeProgram(String command, List<String> arguments, Redirection redirection) {
         try {
             List<String> commandList = new ArrayList<>();
             commandList.add(command);
@@ -133,9 +153,13 @@ public class Main {
             pb.directory(currentDirectory.toFile());
 
             pb.inheritIO();
-            if (outputFile != null) {
-                pb.redirectOutput(new File(outputFile));
-            }
+            if (redirection != null) {
+                if(redirection.type.equals(">") || redirection.type.equals("1>")) {
+                    pb.redirectOutput(new File(redirection.file));
+                } else if (redirection.type.equals("2>")) {
+                    pb.redirectError(new File(redirection.file));
+                }
+            } 
 
             Process process = pb.start();
             process.waitFor();
@@ -174,14 +198,14 @@ public class Main {
 
             if (inSingleQuotes) {
                 if (c == '\'') {
-                    inSingleQuotes = false; 
-                }else {
+                    inSingleQuotes = false;
+                } else {
                     current.append(c);
                 }
             } else if (inDoubleQuotes) {
                 if (c == '\"') {
-                    inDoubleQuotes = false; 
-                }else if (c == '\\' && i + 1 < input.length()) {
+                    inDoubleQuotes = false;
+                } else if (c == '\\' && i + 1 < input.length()) {
                     current.append(input.charAt(i + 1));
                     i++;
                 } else {
@@ -192,10 +216,10 @@ public class Main {
                     current.append(input.charAt(i + 1));
                     i++;
                 } else if (c == '\'') {
-                    inSingleQuotes = true; 
-                }else if (c == '\"') {
-                    inDoubleQuotes = true; 
-                }else if (c == ' ') {
+                    inSingleQuotes = true;
+                } else if (c == '\"') {
+                    inDoubleQuotes = true;
+                } else if (c == ' ') {
                     if (current.length() > 0) {
                         args.add(current.toString());
                         current = new StringBuilder();
@@ -209,5 +233,14 @@ public class Main {
             args.add(current.toString());
         }
         return args;
+    }
+}
+
+ class Redirection {
+    public final String type;
+    public final String file;
+    public Redirection(String type, String file) {
+        this.type = type;
+        this.file = file;
     }
 }
