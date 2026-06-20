@@ -33,50 +33,27 @@ public class Main {
                 continue;
             }
 
-            List<String> inputParts = parsedQuotes(input);
-            String command = inputParts.get(0);
-            List<String> arguments = inputParts.size() > 1 ? inputParts.subList(1, inputParts.size())
-                    : new ArrayList<>();
-
-            handleCommand(command, arguments);
-        }
-    }
-
-    private static void handleCommand(String command, List<String> arguments) {
-        Redirection redirection = extractRedirection(arguments);
-        String argstr = String.join(" ", arguments);
-        boolean isBackground = checkBackground(arguments);
-        switch (command) {
-            case "exit":
-                System.exit(0);
-                break;
-            case "echo":
-                handleEcho(argstr, redirection);
-                break;
-            case "type":
-                handleType(argstr);
-                break;
-            case "pwd":
-                System.out.println(currentDirectory.toAbsolutePath());
-                break;
-            case "cd":
-                handleCd(argstr);
-                break;
-            case "jobs":
-                handleJobs();
-                break;
-            default:
-                String executablePath = findExecutable(command);
-
-                if (executablePath == null) {
-                    System.out.println(command + ": command not found");
+            List<String> tokens = parser(input);
+            List<List<String>> pipeline = new ArrayList<>();
+            List<String> currentCommand = new ArrayList<>();
+            
+            for (String str : tokens) {
+                if (!str.equals("|")) {
+                    currentCommand.add(str);
                 } else {
-                    executeProgram(command, arguments, redirection, isBackground);
+                    pipeline.add(currentCommand);
+                    currentCommand = new ArrayList<>();
                 }
-                break;
+            }
+            
+            if (!currentCommand.isEmpty()) {
+                pipeline.add(currentCommand);
+            }
+            
+            handleExecution(pipeline);
         }
     }
-
+    
     private static void handleEcho(String arguments, Redirection redirection) {
         if (redirection != null) {
             if (redirection.type.equals(">") || redirection.type.equals("1>")) {
@@ -205,47 +182,6 @@ public class Main {
         return null;
     }
 
-    private static void executeProgram(String command, List<String> arguments, Redirection redirection, boolean isBackground) {
-        try {
-            List<String> commandList = new ArrayList<>();
-            commandList.add(command);
-
-            if (!arguments.isEmpty()) {
-                commandList.addAll(arguments);
-            }
-
-            ProcessBuilder pb = new ProcessBuilder(commandList);
-            pb.directory(currentDirectory.toFile());
-            pb.inheritIO();
-            if (redirection != null) {
-                ProcessBuilder.Redirect appendRedirect = ProcessBuilder.Redirect.appendTo(new File(redirection.file));
-                if(redirection.type.equals(">") || redirection.type.equals("1>")) {
-                    pb.redirectOutput(new File(redirection.file));
-                } else if (redirection.type.equals("2>")) {
-                    pb.redirectError(new File(redirection.file));
-                } else if (redirection.type.equals("1>>") || redirection.type.equals(">>")) {
-                    pb.redirectOutput(appendRedirect);
-                } else if (redirection.type.equals("2>>")) {
-                    pb.redirectError(appendRedirect);
-                }
-            } 
-            Process process = pb.start();
-            if(!isBackground) {
-                process.waitFor();
-            } else {
-                int jobId = 1;
-                while(backgroundJobs.containsKey(jobId)) jobId++;
-
-                System.out.println("[" + jobId + "] " + process.pid());
-                String fullCommand = command + (arguments.isEmpty() ? "" : " " + String.join(" ", arguments));
-                backgroundJobs.put(jobId, new Job(process, fullCommand));
-            }
-
-        } catch (Exception e) {
-            System.out.println("Error executing program: " + e.getMessage());
-        }
-    }
-
     private static void handleCd(String pathArg) {
         if (pathArg.equals("~") || pathArg.startsWith("~/")) {
             String homeDir = System.getenv("HOME");
@@ -306,7 +242,7 @@ public class Main {
         }
     }
 
-    private static List<String> parsedQuotes(String input) {
+    private static List<String> parser(String input) {
         List<String> args = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingleQuotes = false;
@@ -353,9 +289,125 @@ public class Main {
         }
         return args;
     }
+
+    private static ProcessBuilder createBuilder(String command, List<String> arguments, Redirection redirection) {
+        List<String> fullCmd = new ArrayList<>();
+        fullCmd.add(command);
+        fullCmd.addAll(arguments);
+
+        ProcessBuilder pb = new ProcessBuilder(fullCmd);
+        pb.directory(currentDirectory.toFile());
+
+        if (redirection != null) {
+            ProcessBuilder.Redirect appendRedirect = ProcessBuilder.Redirect.appendTo(new File(redirection.file));
+            if(redirection.type.equals(">") || redirection.type.equals("1>")) {
+                pb.redirectOutput(new File(redirection.file));
+            } else if (redirection.type.equals("2>")) {
+                pb.redirectError(new File(redirection.file));
+            } else if (redirection.type.equals("1>>") || redirection.type.equals(">>")) {
+                pb.redirectOutput(appendRedirect);
+            } else if (redirection.type.equals("2>>")) {
+                pb.redirectError(appendRedirect);
+            }
+        }
+        return pb;
+    }
+
+    private static void handleExecution(List<List<String>> pipeline) {
+        if (pipeline.isEmpty()) return;
+
+        if (pipeline.size() == 1) {
+            List<String> cmdTokens = pipeline.get(0);
+            String command = cmdTokens.get(0);
+            
+            if (BUILTINS.contains(command)) {
+                List<String> arguments = cmdTokens.size() > 1 
+                        ? new ArrayList<>(cmdTokens.subList(1, cmdTokens.size())) 
+                        : new ArrayList<>();
+                Redirection redirection = extractRedirection(arguments);
+                
+                switch (command) {
+                    case "exit": System.exit(0); break;
+                    case "echo": handleEcho(String.join(" ", arguments), redirection); break;
+                    case "type": handleType(String.join(" ", arguments)); break;
+                    case "pwd": System.out.println(currentDirectory.toAbsolutePath()); break;
+                    case "cd": handleCd(String.join(" ", arguments)); break;
+                    case "jobs": handleJobs(); break;
+                }
+                return; 
+            }
+        }
+
+        try {
+            List<String> lastCmdTokens = pipeline.get(pipeline.size() - 1);
+            boolean isBackground = checkBackground(lastCmdTokens);
+
+            List<ProcessBuilder> builders = new ArrayList<>();
+
+            for (int i = 0; i < pipeline.size(); i++) {
+                List<String> cmdTokens = pipeline.get(i);
+                if (cmdTokens.isEmpty()) continue;
+
+                String command = cmdTokens.get(0);
+                
+                if (findExecutable(command) == null) {
+                    System.out.println(command + ": command not found");
+                    return; 
+                }
+
+                List<String> arguments = cmdTokens.size() > 1 
+                        ? new ArrayList<>(cmdTokens.subList(1, cmdTokens.size())) 
+                        : new ArrayList<>();
+
+                Redirection redirection = extractRedirection(arguments);
+                ProcessBuilder pb = createBuilder(command, arguments, redirection);
+
+                if (redirection == null) {
+                    if (i == 0) pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
+                    if (i == pipeline.size() - 1) pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                } else {
+                    if (i == 0) pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
+                    if (redirection.type.equals("2>") || redirection.type.equals("2>>")) {
+                        if (i == pipeline.size() - 1) pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                    } else {
+                        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                    }
+                }
+                
+                builders.add(pb);
+            }
+
+            if (builders.isEmpty()) return;
+
+            List<Process> processes = ProcessBuilder.startPipeline(builders);
+            Process lastProcess = processes.get(processes.size() - 1);
+
+            if (!isBackground) {
+                lastProcess.waitFor();
+            } else {
+                List<String> fullPipelineStrings = new ArrayList<>();
+                for (List<String> cmd : pipeline) {
+                    fullPipelineStrings.add(String.join(" ", cmd));
+                }
+                String fullPipelineCommand = String.join(" | ", fullPipelineStrings);
+
+                int jobId = 1;
+                while (backgroundJobs.containsKey(jobId)) {
+                    jobId++;
+                }
+
+                System.out.println("[" + jobId + "] " + lastProcess.pid());
+                backgroundJobs.put(jobId, new Job(lastProcess, fullPipelineCommand));
+            }
+
+        } catch (Exception e) {
+            System.out.println("Error executing command: " + e.getMessage());
+        }
+    }
 }
 
- class Redirection {
+class Redirection {
     public final String type;
     public final String file;
     public Redirection(String type, String file) {
