@@ -7,7 +7,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -18,6 +20,8 @@ public class Main {
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
 
     private static int backgroundJobCount = 1;
+    
+    private static Map<Integer, Job> backgroundJobs = new LinkedHashMap<>();
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
@@ -120,7 +124,20 @@ public class Main {
     }
 
     private static void handleJobs() {
+        var iterator = backgroundJobs.entrySet().iterator();
+        
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            int jobId = entry.getKey();
+            Job job = entry.getValue();
 
+            if (job.process.isAlive()) {
+                System.out.println("[" + jobId + "]+ Running " + job.command);
+            } else {
+                System.out.println("[" + jobId + "]+ Done " + job.command);
+                iterator.remove(); 
+            }
+        }
     }
 
     private static Redirection extractRedirection(List<String> arguments) {
@@ -197,6 +214,8 @@ public class Main {
                 process.waitFor();
             } else {
                 System.out.println("[" + backgroundJobCount + "] " + process.pid());
+                String fullCommand = command + (arguments.isEmpty() ? "" : " " + String.join(" ", arguments));
+                backgroundJobs.put(backgroundJobCount, new Job(process, fullCommand));
                 backgroundJobCount++;
             }
 
@@ -286,5 +305,15 @@ public class Main {
     public Redirection(String type, String file) {
         this.type = type;
         this.file = file;
+    }
+}
+
+class Job {
+    public final Process process;
+    public final String command;
+
+    public Job(Process process, String command) {
+        this.process = process;
+        this.command = command;
     }
 }
