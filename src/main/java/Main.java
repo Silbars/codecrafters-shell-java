@@ -123,7 +123,20 @@ public class Main {
         }
     }
 
-    private static void handleJobs() {
+        private static void handleJobs() {
+
+        List<Integer> activeIds = new ArrayList<>(backgroundJobs.keySet());
+        
+        int mostRecentId = -1;
+        int secondMostRecentId = -1;
+        
+        if (activeIds.size() > 0) {
+            mostRecentId = activeIds.get(activeIds.size() - 1);
+        }
+        if (activeIds.size() > 1) {
+            secondMostRecentId = activeIds.get(activeIds.size() - 2);
+        }
+
         var iterator = backgroundJobs.entrySet().iterator();
         
         while (iterator.hasNext()) {
@@ -131,10 +144,17 @@ public class Main {
             int jobId = entry.getKey();
             Job job = entry.getValue();
 
+            char statusChar = ' ';
+            if (jobId == mostRecentId) {
+                statusChar = '+';
+            } else if (jobId == secondMostRecentId) {
+                statusChar = '-';
+            }
+
             if (job.process.isAlive()) {
-                System.out.println("[" + jobId + "]+ Running " + job.command);
+                System.out.println("[" + jobId + "]" + statusChar + " Running " + "     " + job.command);
             } else {
-                System.out.println("[" + jobId + "]+ Done " + job.command);
+                System.out.println("[" + jobId + "]" + statusChar + " Done " + "        " + job.command);
                 iterator.remove(); 
             }
         }
