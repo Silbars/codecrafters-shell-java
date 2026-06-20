@@ -13,7 +13,7 @@ import java.util.Set;
 
 public class Main {
 
-    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd", "cd"));
+    private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd", "cd", "jobs"));
 
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
 
@@ -54,6 +54,9 @@ public class Main {
                 break;
             case "cd":
                 handleCd(argstr);
+                break;
+            case "jobs":
+                handleJobs();
                 break;
             default:
                 String executablePath = findExecutable(command);
@@ -111,6 +114,10 @@ public class Main {
                 System.out.println(input + " is " + executablePath);
             }
         }
+    }
+
+    private static void handleJobs() {
+
     }
 
     private static Redirection extractRedirection(List<String> arguments) {
