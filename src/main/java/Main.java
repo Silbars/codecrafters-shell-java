@@ -51,6 +51,7 @@ public class Main {
             }
             
             handleExecution(pipeline);
+            checkBackgroundJobs();
         }
     }
     
@@ -129,9 +130,9 @@ public class Main {
             }
 
             if (job.process.isAlive()) {
-                System.out.println("[" + jobId + "]" + statusChar + " Running " + "     " + job.command);
+                System.out.printf("[%d]%c  Running               %s%n", jobId, statusChar, job.command);
             } else {
-                System.out.println("[" + jobId + "]" + statusChar + " Done " + "        " + job.command);
+                System.out.printf("[%d]%c  Done                 %s%n", jobId, statusChar, job.command);
                 iterator.remove(); 
             }
         }
@@ -236,7 +237,7 @@ public class Main {
             }
 
             if (!job.process.isAlive()) {
-                System.out.println("[" + jobId + "]" + statusChar + " Done " + "        " + job.command);
+                System.out.printf("[%d]%c  Done                 %s%n", jobId, statusChar, job.command);
                 iterator.remove(); 
             }
         }
