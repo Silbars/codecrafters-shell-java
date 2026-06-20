@@ -26,6 +26,8 @@ public class Main {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         while (true) {
+            checkBackgroundJobs();
+
             System.out.print("$ ");
             String input = sc.nextLine().trim();
 
@@ -123,14 +125,14 @@ public class Main {
         }
     }
 
-        private static void handleJobs() {
+    private static void handleJobs() {
 
         List<Integer> activeIds = new ArrayList<>(backgroundJobs.keySet());
         
         int mostRecentId = -1;
         int secondMostRecentId = -1;
         
-        if (activeIds.size() > 0) {
+        if (!activeIds.isEmpty()) {
             mostRecentId = activeIds.get(activeIds.size() - 1);
         }
         if (activeIds.size() > 1) {
@@ -268,6 +270,40 @@ public class Main {
             return true;
         }
         return false;
+    }
+
+    private static void checkBackgroundJobs() {
+        List<Integer> activeIds = new ArrayList<>(backgroundJobs.keySet());
+        
+        int mostRecentId = -1;
+        int secondMostRecentId = -1;
+        
+        if (!activeIds.isEmpty()) {
+            mostRecentId = activeIds.get(activeIds.size() - 1);
+        }
+        if (activeIds.size() > 1) {
+            secondMostRecentId = activeIds.get(activeIds.size() - 2);
+        }
+
+        var iterator = backgroundJobs.entrySet().iterator();
+        
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            int jobId = entry.getKey();
+            Job job = entry.getValue();
+
+            char statusChar = ' ';
+            if (jobId == mostRecentId) {
+                statusChar = '+';
+            } else if (jobId == secondMostRecentId) {
+                statusChar = '-';
+            }
+
+            if (!job.process.isAlive()) {
+                System.out.println("[" + jobId + "]" + statusChar + " Done " + "        " + job.command);
+                iterator.remove(); 
+            }
+        }
     }
 
     private static List<String> parsedQuotes(String input) {
