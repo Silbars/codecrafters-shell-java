@@ -18,8 +18,6 @@ public class Main {
     private static final Set<String> BUILTINS = new HashSet<>(Arrays.asList("exit", "echo", "type", "pwd", "cd", "jobs"));
 
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
-
-    private static int backgroundJobCount = 1;
     
     private static Map<Integer, Job> backgroundJobs = new LinkedHashMap<>();
 
@@ -235,10 +233,12 @@ public class Main {
             if(!isBackground) {
                 process.waitFor();
             } else {
-                System.out.println("[" + backgroundJobCount + "] " + process.pid());
+                int jobId = 1;
+                while(backgroundJobs.containsKey(jobId)) jobId++;
+
+                System.out.println("[" + jobId + "] " + process.pid());
                 String fullCommand = command + (arguments.isEmpty() ? "" : " " + String.join(" ", arguments));
-                backgroundJobs.put(backgroundJobCount, new Job(process, fullCommand));
-                backgroundJobCount++;
+                backgroundJobs.put(jobId, new Job(process, fullCommand));
             }
 
         } catch (Exception e) {
