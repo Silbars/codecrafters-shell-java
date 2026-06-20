@@ -17,6 +17,8 @@ public class Main {
 
     private static Path currentDirectory = Paths.get(System.getProperty("user.dir"));
 
+    private static int backgroundJobCount = 1;
+
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         while (true) {
@@ -39,6 +41,7 @@ public class Main {
     private static void handleCommand(String command, List<String> arguments) {
         Redirection redirection = extractRedirection(arguments);
         String argstr = String.join(" ", arguments);
+        boolean isBackground = checkBackground(arguments);
         switch (command) {
             case "exit":
                 System.exit(0);
@@ -64,7 +67,7 @@ public class Main {
                 if (executablePath == null) {
                     System.out.println(command + ": command not found");
                 } else {
-                    executeProgram(command, arguments, redirection);
+                    executeProgram(command, arguments, redirection, isBackground);
                 }
                 break;
         }
@@ -165,7 +168,7 @@ public class Main {
         return null;
     }
 
-    private static void executeProgram(String command, List<String> arguments, Redirection redirection) {
+    private static void executeProgram(String command, List<String> arguments, Redirection redirection, boolean isBackground) {
         try {
             List<String> commandList = new ArrayList<>();
             commandList.add(command);
@@ -189,9 +192,13 @@ public class Main {
                     pb.redirectError(appendRedirect);
                 }
             } 
-
             Process process = pb.start();
-            process.waitFor();
+            if(!isBackground) {
+                process.waitFor();
+            } else {
+                System.out.println("[" + backgroundJobCount + "] " + process.pid());
+                backgroundJobCount++;
+            }
 
         } catch (Exception e) {
             System.out.println("Error executing program: " + e.getMessage());
@@ -214,6 +221,14 @@ public class Main {
         } else {
             System.out.println("cd: " + pathArg + ": No such file or directory");
         }
+    }
+
+    private static boolean checkBackground(List<String> args) {
+        if(!args.isEmpty() && args.getLast().equals("&")) {
+            args.removeLast();
+            return true;
+        }
+        return false;
     }
 
     private static List<String> parsedQuotes(String input) {
